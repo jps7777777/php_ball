@@ -13,10 +13,12 @@ class Index extends Base
         $info = model("Ball")->get_info([['id','eq',555555]],"*");
         var_dump($info);
 
-
+        return "";
 
 
     }
+
+
 
 
 }
