@@ -10,12 +10,13 @@ namespace app\index\controller;
 
 
 use think\Controller;
+use think\Request;
 
 class Base extends Controller
 {
     public function __construct()
     {
-        parent::__construct(null);
+//        parent::__construct(new Request);
         header('Access-Control-Allow-Origin:*');
     }
 
