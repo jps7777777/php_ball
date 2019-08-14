@@ -14,28 +14,28 @@ use think\facade\Request;
 class User extends Base
 {
 
-
-
     
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
     public function add_user(){
         $phone = input("mobile");
         $password = input("password");
