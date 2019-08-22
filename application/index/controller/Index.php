@@ -16,6 +16,8 @@ class Index extends Base
 
 
     public function send_mail(){
+
+
 //        $mail_content = <<<mailcontent
 //    这里是富文本内容区，在此可以写html内容<a href="http://baidu.com">百度</a>
 //        mailcontent;

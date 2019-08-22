@@ -14,12 +14,48 @@ class Game extends Base
 
     public function index()
     {
+
+        $this->method_one();
+
+
 //        $this->update_result();
 //        $user_id = input("user_id");
 //        if (empty($user_id)) {
 //            $this->json("用户不存在");
 //        }
 //        $this->add_result($user_id,8456,3);
+    }
+
+    /**
+     * 根据平均值进行投入
+     * @author 金
+     * @create time 2019-8-14 0014 16:10
+     */
+    public function method_one()
+    {
+        $data = $this->get_match_statistics();
+        $total = array_sum($data['appear_total']);
+        $cal_info = [];
+        var_dump($data['appear_total']);
+        $near_num = 10;
+        $choose = 0;
+        foreach ($data['appear_total'] as $a=>$b){
+            $tmp = number_format(($b/$total)*100,2,'.','');
+            $tmp_cal = abs($b-10);
+            if($tmp_cal<$near_num){
+                $choose = $a;
+                $near_num = $tmp_cal;
+            }
+            $cal_info[$a] = $tmp;
+        }
+        var_dump($cal_info);
+//        $ave = number_format($ave_total,2,'.','');
+        var_dump($choose);
+//        var_dump($ave_total);
+//        var_dump($ave);
+
+
+
     }
 
 
@@ -30,9 +66,10 @@ class Game extends Base
      * @param $user_id
      * @param $issue
      * @param $num
+     * @param $ball
      * @return bool|string
      */
-    public function add_result($user_id, $issue, $num)
+    public function add_result($user_id, $issue, $num,$ball = 1)
     {
         if (empty($user_id) || empty($num) || empty($issue)) {
             return "选择信息错误";
@@ -42,7 +79,8 @@ class Game extends Base
             'issue' => $issue,
             'choose_number' => $num,
             'pay' => 10,
-            'count' => 1
+            'count' => 1,
+            'choose_ball' => $ball,
         ];
         $where_last = [
             ["user_id", 'eq', $user_id],
@@ -108,6 +146,24 @@ class Game extends Base
 
     }
 
+    public function get_match_statistics()
+    {
+        $old_match = model("Ball")->get_list_by_page('', '*', 'create_time desc', 0, 60);
+        $sort_match = [];
+        $total = ["0" => 0, "1" => 0, "2" => 0, "3" => 0, "4" => 0, "5" => 0, "6" => 0, "7" => 0, "8" => 0, "9" => 0];
+        foreach ($old_match as $i => $j) {
+            $sort_match[$j['id']][1] = $j['number_one'];
+            $sort_match[$j['id']][2] = $j['number_two'];
+            $sort_match[$j['id']][3] = $j['number_three'];
+            $sort_match[$j['id']][4] = $j['number_four'];
+            $sort_match[$j['id']][5] = $j['number_five'];
+            $total = $this->cal_appear_total($sort_match[$j['id']], $total);
+        }
+        $res['appear_total'] = $total;
+        $res['last_appear'] = $this->cal_last_appear($sort_match);;
+        $res['match'] = $sort_match;
+        return $res;
+    }
 
     public function cal_old_match()
     {
@@ -152,17 +208,6 @@ class Game extends Base
         return $total;
     }
 
-
-    /**
-     * 根据平均值进行投入
-     * @author 金
-     * @create time 2019-8-14 0014 16:10
-     */
-    public function method_one()
-    {
-
-
-    }
 
 
 }

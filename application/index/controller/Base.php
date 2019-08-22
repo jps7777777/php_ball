@@ -18,6 +18,11 @@ class Base extends Controller
     {
 //        parent::__construct(new Request);
         header('Access-Control-Allow-Origin:*');
+
+
+
+
+
     }
 
     /**

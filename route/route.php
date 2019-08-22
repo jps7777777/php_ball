@@ -9,12 +9,27 @@
 // | Author: liu21st <liu21st@gmail.com>
 // +----------------------------------------------------------------------
 
-Route::get('think', function () {
-    return 'hello,ThinkPHP5!';
-});
+use think\facade\Route;
+
+//Route::get('think', function () {
+//    return 'hello,ThinkPHP5!';
+//});
 
 Route::get('hello/:name', 'index/hello');
+Route::get('game/match', 'index/Game/index');
 
-return [
 
-];
+
+Route::get('game/update', 'index/Game/update_result');
+
+
+
+
+Route::get('user/info','index/User/get_user_info');
+Route::get('login/login', 'index/Login/login');
+Route::get('login/register', 'index/Login/register');
+Route::get('login/phone_code', 'index/Login/send_verify_code');
+
+//return [
+//
+//];
