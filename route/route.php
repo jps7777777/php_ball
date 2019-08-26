@@ -28,11 +28,18 @@ Route::get('game/update', 'index/Game/update_result');
 
 
 Route::get('user/info','index/User/get_user_info');
+
+
+// 用户登录信息合并
+Route::post('user/merge','index/User/merge_user_info');
+
+
 // 用户注册登录
 Route::get('register', 'index/Login/register');
 Route::get('login', 'index/Login/login_html');
 Route::get('inLogin', 'index/Login/login_interface');
 Route::get('send/code', 'index/Login/send_verify_code');
+Route::get('send/merge_code', 'index/User/send_merge_code');
 // 其他登录方式
 Route::get('wx_login', 'index/Wx/wx_login');
 Route::get('zfb_login', 'index/Login/zfb_login');

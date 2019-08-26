@@ -27,30 +27,11 @@ class Login extends Controller
         if (empty($mobile)) {
             $this->json("电话号码不能为空", "error", 0);
         }
-        $code = random_int(100000, 999999);
-        $data = model("VerifyCode")->get_info([['mobile', 'eq', $mobile], ['type', 'eq', $type]], "*");
-        if (empty($data)) {
-            $data = [];
-            $data['mobile'] = $mobile;
-            $data['count'] = 1;
-            $data['type'] = $type;
-            $data['code'] = $code;
-            model("VerifyCode")->save($data);
-            $this->json("验证信息已发送");
+        $flag = send_verify_code($mobile,$type);
+        if($flag !== true) {
+            $this->json($flag, "error", 0);
         }
-        if (isset($data) && $data['count'] > 19) {
-            $this->json("今日验证次数过多", "error", 0);
-        }
-        if (isset($data) && abs(time() - strtotime($data['update_time'])) < 60) {
-            $this->json("发送过于频繁，请稍后再试", "error", 0);
-        }
-        $save_data = [];
-        $save_data['id'] = $data['id'];
-        $save_data['count'] = $data['count'] + 1;
-        $save_data['code'] = $code;
-        $save_data['is_use'] = 0;
-        model("VerifyCode")->isUpdate(true)->save($save_data);
-        $this->json("验证信息已发送");
+        $this->json("验证短信已发送");
     }
 
     /**
@@ -128,7 +109,7 @@ class Login extends Controller
         if(empty($mobile) || empty($verify)){
             $this->json("验证信息不能为空","error",0);
         }
-        $bool = $this->verify_code($mobile,$verify,$type);
+        $bool = verify_code($mobile,$verify,$type);
         if($bool !== true){
             $this->json("$bool","error",0);
         }
@@ -162,25 +143,25 @@ class Login extends Controller
      * @param $send_type
      * @return bool
      */
-    private function verify_code($mobile,$code,$send_type = 0){
-        if (empty($mobile) || empty($code) || strlen($code)<6) {
-            return "验证信息不正确";
-        }
-        $data = model("VerifyCode")->get_info([['mobile', 'eq', $mobile], ['type', 'eq', $send_type],['is_use','eq',0]], "*");
-        if(empty($data)){
-            return "验证码不存在";
-        }
-        if(abs(time() - strtotime($data['update_time'])) > 600){
-            return "验证码已过期";
-        }
-        if($code != $data['code']){
-            return "验证码输入错误";
-        }
-        $save_data['id'] = $data['id'];
-        $save_data['is_use'] = 1;
-        model("VerifyCode")->isUpdate(true)->save($save_data);
-        return true;
-    }
+//    private function verify_code($mobile,$code,$send_type = 0){
+//        if (empty($mobile) || empty($code) || strlen($code)<6) {
+//            return "验证信息不正确";
+//        }
+//        $data = model("VerifyCode")->get_info([['mobile', 'eq', $mobile], ['type', 'eq', $send_type],['is_use','eq',0]], "*");
+//        if(empty($data)){
+//            return "验证码不存在";
+//        }
+//        if(abs(time() - strtotime($data['update_time'])) > 600){
+//            return "验证码已过期";
+//        }
+//        if($code != $data['code']){
+//            return "验证码输入错误";
+//        }
+//        $save_data['id'] = $data['id'];
+//        $save_data['is_use'] = 1;
+//        model("VerifyCode")->isUpdate(true)->save($save_data);
+//        return true;
+//    }
 
 
     /**
