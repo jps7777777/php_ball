@@ -14,7 +14,6 @@ class Game extends Base
 
     public function index()
     {
-
         $this->method_one();
 
 
@@ -36,7 +35,6 @@ class Game extends Base
         $data = $this->get_match_statistics();
         $total = array_sum($data['appear_total']);
         $cal_info = [];
-        var_dump($data['appear_total']);
         $near_num = 10;
         $choose = 0;
         foreach ($data['appear_total'] as $a=>$b){
@@ -48,13 +46,6 @@ class Game extends Base
             }
             $cal_info[$a] = $tmp;
         }
-        var_dump($cal_info);
-//        $ave = number_format($ave_total,2,'.','');
-        var_dump($choose);
-//        var_dump($ave_total);
-//        var_dump($ave);
-
-
 
     }
 

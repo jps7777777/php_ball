@@ -14,60 +14,6 @@ use think\facade\Request;
 class Login extends Controller
 {
 
-    public function login(){
-        $mobile = input("mobile");
-        $verify = input("code");
-        $type = input("send_type",0);
-        if(empty($mobile) || empty($verify)){
-            $this->json("验证信息不能为空","error",0);
-        }
-        $bool = $this->verify_code($mobile,$verify,$type);
-        if($bool !== true){
-            $this->json("$bool","error",0);
-        }
-        $user = model("User")->get_info([['phone','eq',$mobile]],"");
-        if(empty($user)){
-            $this->json("用户不存在","error",0);
-        }
-        session("user_info",$user);
-        $this->json("登录成功");
-    }
-
-
-    public function register(){
-        $phone = input("mobile");
-        $password = input("password");
-
-        $data = model("User")->get_info([['phone','eq',$phone]],"id,phone");
-        if(!empty($data)){
-            $this->json("","用户已存在",0);
-        }
-        model("User")->startTrans();
-        $user = ['phone'=>$phone,
-            'account'=>substr(Request::token(time().'-'.random_int(1000,9999), 'md5'),0,12)
-        ];
-        model("User")->save($user);
-        $last_id = model("User")->getLastInsID();
-        $user_login = [
-            'user_id'=>$last_id,
-            'credential'=>md5(sha1($password."self")),
-            'login_type'=>0
-        ];
-        $flag_1 = model("UserLogin")->save($user_login);
-        $user_info = [
-            'user_id'=>$last_id,
-            'balance'=>1000000
-        ];
-        $flag_2 = model("UserInfo")->save($user_info);
-        if($flag_1 && $flag_2){
-            model("User")->commit();
-            $this->json("添加成功");
-        }else{
-            model("User")->rollback();
-            $this->json("添加失败了。");
-        }
-    }
-
     /**
      * 发送短信验证码
      * @author 金
@@ -105,6 +51,106 @@ class Login extends Controller
         $save_data['is_use'] = 0;
         model("VerifyCode")->isUpdate(true)->save($save_data);
         $this->json("验证信息已发送");
+    }
+
+    /**
+     * 用户注册
+     * @author 金
+     * @create time 2019-8-23 0023 9:19
+     * @throws \think\exception\PDOException
+     */
+    public function register(){
+        $phone = input("mobile");
+        $password = input("password");
+        $data = model("User")->get_info([['phone','eq',$phone]],"id,phone");
+        if(!empty($data)){
+            $this->json("","用户已存在",0);
+        }
+        model("User")->startTrans();
+        $user = ['phone'=>$phone,
+            'account'=>substr(Request::token(time().'-'.random_int(1000,9999), 'md5'),0,12)
+        ];
+        model("User")->save($user);
+        $last_id = model("User")->getLastInsID();
+        $user_login = [
+            'user_id'=>$last_id,
+            'credential'=>md5(sha1($password."self")),
+            'login_type'=>0
+        ];
+        $flag_1 = model("UserLogin")->save($user_login);
+        $user_info = [
+            'user_id'=>$last_id,
+            'balance'=>1000000
+        ];
+        $flag_2 = model("UserInfo")->save($user_info);
+        if($flag_1 && $flag_2){
+            model("User")->commit();
+            $this->json("添加成功");
+        }else{
+            model("User")->rollback();
+            $this->json("添加失败了。");
+        }
+    }
+
+    /**
+     * 本地登录
+     * @author 金
+     * @create time 2019-8-23 0023 9:18
+     */
+    public function login_html(){
+        $mobile = input("mobile");
+        $verify = input("code");
+        $type = input("send_type",0);
+        if(empty($mobile) || empty($verify)){
+            $this->json("验证信息不能为空","error",0);
+        }
+        $bool = $this->verify_code($mobile,$verify,$type);
+        if($bool !== true){
+            $this->json("$bool","error",0);
+        }
+        $user = model("User")->get_info([['phone','eq',$mobile]],"*");
+        if(empty($user)){
+            $this->json("用户不存在","error",0);
+        }
+        session("user_info",$user);
+        $this->json("登录成功");
+    }
+
+    /**
+     * 本地登录
+     * @author 金
+     * @create time 2019-8-23 0023 9:18
+     */
+    public function login_interface(){
+        $mobile = input("mobile");
+        $verify = input("code");
+        $type = input("send_type",0);
+        if(empty($mobile) || empty($verify)){
+            $this->json("验证信息不能为空","error",0);
+        }
+        $bool = $this->verify_code($mobile,$verify,$type);
+        if($bool !== true){
+            $this->json("$bool","error",0);
+        }
+        $user = model("User")->get_info([['phone','eq',$mobile]],"*");
+        if(empty($user)){
+            $this->json("用户不存在","error",0);
+        }
+        $token = Request::token(time().'-'.random_int(1000,9999), 'md5');
+        $save_user = [
+            'id'=>$user['id'],
+            'token'=>$token
+        ];
+        model("User")->isUpdate(true)->save($save_user);
+        session("$token",$user);
+        $return = [
+            'token'=>$token,
+            'nick_name'=>$user['nick_name'],
+            'account'=>$user['account'],
+            'avatar'=>$user['avatar'],
+            'phone'=>$user['phone']
+        ];
+        $this->json($return);
     }
 
     /**

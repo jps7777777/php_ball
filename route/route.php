@@ -25,10 +25,19 @@ Route::get('game/update', 'index/Game/update_result');
 
 
 
+
+
 Route::get('user/info','index/User/get_user_info');
-Route::get('login/login', 'index/Login/login');
-Route::get('login/register', 'index/Login/register');
-Route::get('login/phone_code', 'index/Login/send_verify_code');
+// 用户注册登录
+Route::get('register', 'index/Login/register');
+Route::get('login', 'index/Login/login_html');
+Route::get('inLogin', 'index/Login/login_interface');
+Route::get('send/code', 'index/Login/send_verify_code');
+// 其他登录方式
+Route::get('wx_login', 'index/Wx/wx_login');
+Route::get('zfb_login', 'index/Login/zfb_login');
+Route::get('qq_login', 'index/Login/qq_login');
+Route::get('wb_login', 'index/Login/wb_login');
 
 //return [
 //

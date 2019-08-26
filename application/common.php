@@ -10,3 +10,44 @@
 // +----------------------------------------------------------------------
 
 // 应用公共文件
+
+
+
+
+function http_get_url($url){
+    //初始化
+    $curl = curl_init();
+    //设置参数
+    curl_setopt($curl, CURLOPT_URL, $url);
+    curl_setopt($curl, CURLOPT_RETURNTRANSFER, 1);
+    curl_setopt($curl, CURLOPT_FAILONERROR, false);
+    $result = curl_exec($curl);
+    curl_close($curl);
+    return $result;
+}
+
+//function http_post_url($url){
+//    //初始化
+//    $curl = curl_init();
+//    //设置参数
+//    curl_setopt($curl, CURLOPT_URL, $url);
+//    curl_setopt($curl, CURLOPT_RETURNTRANSFER, 1);
+//    curl_setopt($curl, CURLOPT_FAILONERROR, false);
+//    $result = curl_exec($curl);
+//    curl_close($curl);
+//    return $result;
+//}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
