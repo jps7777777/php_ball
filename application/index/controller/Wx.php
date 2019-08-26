@@ -51,7 +51,7 @@ class Wx
 
         $user_login = [
             'user_id'=>$user_id,
-            'credential'=>$res['unionid'],
+            'credential'=>trim($res['unionid']," "),
             'login_type'=>2
         ];
         $flag_1 = model("UserLogin")->save($user_login);
@@ -142,7 +142,7 @@ class Wx
             \"PRIVILEGE1\", 
             \"PRIVILEGE2\"
             ],
-            \"unionid\": \" o6_bmasda5sdsad6_2sgVtMZOPfL\"
+            \"unionid\": \" o6_bmadsda5sdssad6_2sgVtMZOPfL\"
             } ";
         return json_decode($right_res,true);
     }
