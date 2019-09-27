@@ -27,6 +27,8 @@ class Game extends Base
 
     /**
      * 根据平均值进行投入
+     * 选择平均出现次数的数值进行投注
+     * 随机选择
      * @author 金
      * @create time 2019-8-14 0014 16:10
      */
@@ -51,6 +53,69 @@ class Game extends Base
 
     }
 
+    /**
+     * 获取最后一次数据结果集
+     * @author 金
+     * @create time 2019-9-27 0027 9:54
+     */
+    public function get_last_result()
+    {
+        $user_id = input("user_id");
+        if (empty($user_id)) {
+            $this->json("用户不存在");
+        }
+        $user_info = model("Result")->get_info([['user_id', 'eq', $user_id]], "*");
+        $this->json($user_info);
+    }
+
+    /**
+     * 获取比赛数据分析值
+     * @author 金
+     * @create time 2019-9-27 0027 9:53
+     * @return mixed
+     */
+    public function get_match_statistics()
+    {
+        $old_match = model("Ball")->get_list_by_page('', '*', 'create_time desc', 0, 60);
+        $sort_match = [];
+        $total = ["0" => 0, "1" => 0, "2" => 0, "3" => 0, "4" => 0, "5" => 0, "6" => 0, "7" => 0, "8" => 0, "9" => 0];
+        foreach ($old_match as $i => $j) {
+            $sort_match[$j['id']][1] = $j['number_one'];
+            $sort_match[$j['id']][2] = $j['number_two'];
+            $sort_match[$j['id']][3] = $j['number_three'];
+            $sort_match[$j['id']][4] = $j['number_four'];
+            $sort_match[$j['id']][5] = $j['number_five'];
+            $total = $this->cal_appear_total($sort_match[$j['id']], $total);
+        }
+        $res['appear_total'] = $total;
+        $res['last_appear'] = $this->cal_last_appear($sort_match);;
+        $res['match'] = $sort_match;
+        return $res;
+    }
+
+    /**
+     * 返回最新60次结果集及出现次数、最后数值出现次数
+     * @author 金
+     * @create time 2019-9-27 0027 9:52
+     */
+    public function cal_old_match()
+    {
+        $old_match = model("Ball")->get_list_by_page('', '*', 'create_time desc', 0, 60);
+        $sort_match = [];
+        $total = ["0" => 0, "1" => 0, "2" => 0, "3" => 0, "4" => 0, "5" => 0, "6" => 0, "7" => 0, "8" => 0, "9" => 0];
+        foreach ($old_match as $i => $j) {
+            $sort_match[$j['id']][1] = $j['number_one'];
+            $sort_match[$j['id']][2] = $j['number_two'];
+            $sort_match[$j['id']][3] = $j['number_three'];
+            $sort_match[$j['id']][4] = $j['number_four'];
+            $sort_match[$j['id']][5] = $j['number_five'];
+            $total = $this->cal_appear_total($sort_match[$j['id']], $total);
+        }
+        $res['appear_total'] = $total;
+        $res['last_appear'] = $this->cal_last_appear($sort_match);;
+        $res['match'] = $sort_match;
+        $this->json($res);
+    }
 
     /**
      *
@@ -62,7 +127,7 @@ class Game extends Base
      * @param $ball
      * @return bool|string
      */
-    public function add_result($user_id, $issue, $num,$ball = 1)
+    private function add_result($user_id, $issue, $num,$ball = 1)
     {
         if (empty($user_id) || empty($num) || empty($issue)) {
             return "选择信息错误";
@@ -88,7 +153,14 @@ class Game extends Base
         return true;
     }
 
-    public function update_result()
+    /**
+     * 修改结果
+     * @author 金
+     * @create time 2019-9-27 0027 9:50
+     * @return string
+     * @throws \Exception
+     */
+    private function update_result()
     {
         $res = model("Ball")->where('id','eq',8477)->order("create_time desc")->find();
 //        $res = model("Ball")->order("create_time desc")->find();
@@ -122,62 +194,27 @@ class Game extends Base
         return "ok";
     }
 
+    /**
+     * 获取num序号对应的值
+     * @author 金
+     * @create time 2019-9-27 0027 9:50
+     * @param $num
+     * @return mixed
+     */
     private function get_ball_num($num){
         $arr = [1=>'number_one',2=>'number_two',3=>'number_three',4=>'number_four',5=>'number_five'];
         return $arr[$num];
     }
 
-    public function get_last_result()
-    {
-        $user_id = input("user_id");
-        if (empty($user_id)) {
-            $this->json("用户不存在");
-        }
-        $user_info = model("Result")->get_info([['user_id', 'eq', $user_id]], "*");
-        var_dump($user_info);
-        $this->add_result();
 
-    }
-
-    public function get_match_statistics()
-    {
-        $old_match = model("Ball")->get_list_by_page('', '*', 'create_time desc', 0, 60);
-        $sort_match = [];
-        $total = ["0" => 0, "1" => 0, "2" => 0, "3" => 0, "4" => 0, "5" => 0, "6" => 0, "7" => 0, "8" => 0, "9" => 0];
-        foreach ($old_match as $i => $j) {
-            $sort_match[$j['id']][1] = $j['number_one'];
-            $sort_match[$j['id']][2] = $j['number_two'];
-            $sort_match[$j['id']][3] = $j['number_three'];
-            $sort_match[$j['id']][4] = $j['number_four'];
-            $sort_match[$j['id']][5] = $j['number_five'];
-            $total = $this->cal_appear_total($sort_match[$j['id']], $total);
-        }
-        $res['appear_total'] = $total;
-        $res['last_appear'] = $this->cal_last_appear($sort_match);;
-        $res['match'] = $sort_match;
-        return $res;
-    }
-
-    public function cal_old_match()
-    {
-        $old_match = model("Ball")->get_list_by_page('', '*', 'create_time desc', 0, 60);
-        $sort_match = [];
-        $total = ["0" => 0, "1" => 0, "2" => 0, "3" => 0, "4" => 0, "5" => 0, "6" => 0, "7" => 0, "8" => 0, "9" => 0];
-        $times = 0;
-        foreach ($old_match as $i => $j) {
-            $sort_match[$j['id']][1] = $j['number_one'];
-            $sort_match[$j['id']][2] = $j['number_two'];
-            $sort_match[$j['id']][3] = $j['number_three'];
-            $sort_match[$j['id']][4] = $j['number_four'];
-            $sort_match[$j['id']][5] = $j['number_five'];
-            $total = $this->cal_appear_total($sort_match[$j['id']], $total);
-        }
-        $res['appear_total'] = $total;
-        $res['last_appear'] = $this->cal_last_appear($sort_match);;
-        $res['match'] = $sort_match;
-        $this->json($res);
-    }
-
+    /**
+     * 计算出现的次数
+     * @author 金
+     * @create time 2019-9-27 0027 9:51
+     * @param $res
+     * @param $total
+     * @return mixed
+     */
     private function cal_appear_total($res, $total)
     {
         foreach ($res as $a => $b) {
@@ -186,6 +223,13 @@ class Game extends Base
         return $total;
     }
 
+    /**
+     * 计算最后出现的次数
+     * @author 金
+     * @create time 2019-9-27 0027 9:51
+     * @param $res
+     * @return array
+     */
     private function cal_last_appear($res)
     {
         $total = ["0" => 0, "1" => 0, "2" => 0, "3" => 0, "4" => 0, "5" => 0, "6" => 0, "7" => 0, "8" => 0, "9" => 0];

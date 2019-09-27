@@ -50,7 +50,7 @@ class Base extends Controller
     protected function json($info = null, $message = "SUCCESS", $status = "1") {
         $data['status'] = $status;
         $data['message'] = $message;
-        $data['time'] = time();
+        $data['time'] = date("Y-m-d H:i:s");
         $data['data'] = $info;
         // 返回JSON数据格式到客户端 包含状态信息
         header('Content-Type:application/json; charset=utf-8');

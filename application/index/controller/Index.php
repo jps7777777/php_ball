@@ -5,6 +5,22 @@ class Index extends Base
 {
     public function index()
     {
+        $start_time = microtime();
+        $sum = 0;
+        for($i = 1;$i<1000000;$i++){
+            $sum += $i;
+        }
+        echo "数据结果：".$sum;
+        echo "<br />";
+        $end_time = microtime();
+        echo "------>".($end_time-$start_time);
+        $start_time_two = microtime();
+        $sum_two = (1000000+1)*1000000/2;
+        echo "第二次计算：".$sum_two;
+        echo "<br />";
+        $end_time_two = microtime();
+        echo "".($end_time_two-$start_time_two);
+
         return "good idea";
     }
 

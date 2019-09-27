@@ -15,13 +15,15 @@ use think\facade\Route;
 //    return 'hello,ThinkPHP5!';
 //});
 
+Route::get('index', 'index/Index/index');
+
+
 Route::get('hello/:name', 'index/hello');
 Route::get('game/match', 'index/Game/index');
 
 
 
 Route::get('game/update', 'index/Game/update_result');
-
 
 
 
@@ -46,6 +48,14 @@ Route::get('zfb_login', 'index/Login/zfb_login');
 Route::get('qq_login', 'index/Login/qq_login');
 Route::get('wb_login', 'index/Login/wb_login');
 
-//return [
-//
-//];
+// 生成二维码登录
+Route::get('qr_code_login', 'index/Login/qr_login');
+
+
+
+
+
+
+
+
+
