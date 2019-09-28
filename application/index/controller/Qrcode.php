@@ -15,7 +15,16 @@ use think\facade\Env;
 class Qrcode extends Base
 {
 
-    private function ali_code_param(){
+    public function ali_code_param(){
+
+        $arc = input("_arc_");
+        $cur = input("__token__");
+
+        $redis = new \Redis();
+        $redis->connect("47.105.151.214","6379",60);
+        $data = $redis->keys("*");
+        var_dump($data);
+
         /**
          * appName: aliyun
         fromSite: -2

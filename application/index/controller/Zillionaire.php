@@ -320,7 +320,7 @@ class Zillionaire extends Base
     // *********************************************  备用方法 ********************************************************
 
 
-//    private function get_house_info(){
+    private function get_house_info_tmp(){
 //        $map = [];// 13/41/42/51/52/53
 //        $exp = ["北京市","天津市","上海市","重庆市"];
 //        $province = ["石家庄市","邯郸市","洛阳市","开封市","武汉市","成都市",
@@ -366,7 +366,7 @@ class Zillionaire extends Base
 //        $file1 = fopen($path1,"w+");
 //        fwrite($file1,$output);
 //        fclose($file1);
-//    }
+    }
 
 
 }
