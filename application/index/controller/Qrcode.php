@@ -15,6 +15,27 @@ use think\facade\Env;
 class Qrcode extends Base
 {
 
+    /**
+     * 移动端扫描信息后，访问后台，把用户信息修改了。
+     * @author 金
+     * @create time 2019-9-29 0029 11:34
+     */
+    public function mobile_call(){
+        /**
+         * 1、接收参数，
+         * 2、修改用户信息
+         */
+        $mobile_token = input("ms_token");
+        $uuid_token = input("uuid_token");
+
+        $redis = new \Redis();
+        $redis->connect("47.105.151.214","6379",60);
+        $redis->set($mobile_token,"");
+        $data = $redis->keys("*");
+
+    }
+
+
     public function ali_code_param(){
 
         $arc = input("_arc_");
@@ -24,6 +45,21 @@ class Qrcode extends Base
         $redis->connect("47.105.151.214","6379",60);
         $data = $redis->keys("*");
         var_dump($data);
+        /**
+         * 1、先获取
+         */
+        $rule = model("district")->get_list(["code"=>15],"*");
+        var_dump($rule);
+
+
+        $token = input("token");
+        $token = input("_qrl_token_");
+        $user = $redis->get($token);
+        if(empty($user)){
+            return "";
+        }
+
+
 
         /**
          * appName: aliyun
