@@ -14,6 +14,24 @@ namespace app\index\controller;
 class Zillionaire extends Base
 {
     protected $redis;
+    // 红橙黄绿青蓝紫
+    // red orange yellow malachite green bluish violet
+    // 红橙黄绿蓝靛紫
+    // Red orange yellow green blue indigo violet
+    protected $user_color = [
+        1=>"red",2=>"orange",3=>"yellow",4=>"green",5=>"blue",6=>"indigo",7=>"violet"
+    ];
+    protected $user_init = [
+        "money"=>2000,
+        "logo"=>0,// 用户图标:0没有图标及颜色
+        "color"=>'white',// 用户图标:0没有图标及颜色
+        "sequence"=>0,// 用户顺序
+        "city"=>"",// 持有土地:城市名,城市名
+        "pledge"=>"",// 抵押房产：城市名，城市名
+        "prison_break_card"=>false,
+        "status"=>1,// 0等待，1正常，2暂停一次，3破产
+        "money_card"=>"5000-0,2000-1,1000-0,500-0,200-0,100-0,50-0,20-0,10-0",//金钱面值-持有数量，金钱面值-持有数量，
+    ];
 
     public function __construct($flag = false)
     {
@@ -21,6 +39,27 @@ class Zillionaire extends Base
         $this->redis = new \Redis();
         $this->redis->connect("47.105.151.214","6379","60");
     }
+
+    /**
+     * 1、登录网站use_token()
+     *      2、添加用户名get_user_name()
+     * 2、创建房间/登录房间
+     * 3、开始游戏
+     *
+     */
+
+
+    /**
+     * 房间：713033
+     *      user_id:4306467515c76:老大
+     *      user_id:fdef270e3cb89:王二
+     *      user_id:aa89f552a1217:张三
+     *      user_id:1a5dcc3ca1ec2:李四
+     *
+     *
+     *
+     */
+
 
     /**
      * 开始游戏
@@ -31,17 +70,38 @@ class Zillionaire extends Base
      * @create time 2019-9-27 0027 11:37
      */
     public function index(){
+        $user_id = input("token");
+        if(empty($user_id)){
+            $this->json("请先登录");
+        }
         $table_id = input("table_id");
         if(empty($table_id)){
             $this->json("房间不存在");
         }
-        $user_num = $this->redis->hGet($table_id,"user_num");
-        $users = $this->redis->hGet($table_id,"users");
-        if(empty($user_num) || count(json_decode($users,true)) != $user_num){
+        $data = $this->redis->hGetAll($table_id);
+        if(empty($data) ){
             $this->json("房间不存在");
         }
-        $map = $this->get_map($user_num);
-
+        if($data['user_num'] > $data['user_now']){
+            $this->json("玩家还没到齐啊，等等再开始啦。");
+        }
+        if($data['user_num'] < $data['user_now']){
+            $this->json("请重新开始牌局。");
+        }
+        // 初始化用户信息：分配金钱，初始化持卡，初始化越狱卡持有状态
+        $k = 1;
+        $users = json_decode($data['users'],true);
+//        foreach ($users as $a =>$b){
+//            $this->user_init['table_id'] = $table_id;
+//            $this->user_init['sequence'] = $k;
+//            $this->user_init['logo'] = $k;
+//            $this->user_init['color'] = $this->user_color[$k];
+//            $this->redis->hMSet($b,$this->user_init);
+//            $k++;
+//        }
+        $map = $this->get_map(count($users));
+        var_dump($map);die;
+        $this->redis->hSet($table_id,"map",$map);
     }
 
     /**
@@ -54,7 +114,8 @@ class Zillionaire extends Base
     public function use_token(){
         $user_id = substr(\Request::token(),1,13);
         // 保存用户信息
-        $this->redis->lSet($user_id,0,$user_id);
+        $this->redis->hSet($user_id,'name',$user_id);
+        $this->redis->hSet($user_id,'table_id',0);
         $this->json($user_id);
     }
 
@@ -75,10 +136,127 @@ class Zillionaire extends Base
             $user_num = 4;
         }
         $this->redis->hSet($table_id,"user_num",$user_num);
+        $this->redis->hSet($table_id,"user_now",1);
         $this->redis->hSet($table_id,"users",json_encode([$token]));
         $this->json("创建房间号:".$table_id);
     }
 
+
+
+
+    /**
+     * 加入房间
+     * @author 金
+     * @create time 2019-10-8 0008 11:48
+     */
+    public function insert_table(){
+        $user_id = input("token");
+        if(empty($user_id)){
+            $this->json("请先登录");
+        }
+        $table_id = input("table_id");
+        if(empty($table_id)){
+            $this->json("房间不存在");
+        }
+        // 设置房间信息
+        $data = $this->redis->hGetAll($table_id);
+        if(empty($data['user_now'])){
+            $this->json("没有用户。");
+        }
+        $user_now = $data['user_now']+1;
+        $users_old = json_decode($data['users'],true);
+        if(in_array($user_id,$users_old)){
+            $this->json("用户已添加。");
+        }
+        $users = array_merge($users_old,[$user_id]);
+        if($user_now > $data['user_num']){
+            $this->json("用户数已满，请重新开始牌局。");
+        }
+        // 修改房间用户信息
+        $this->redis->hSet($table_id,"user_now",$user_now);
+        $this->redis->hSet($table_id,"users",json_encode($users));
+        $this->redis->hSet($table_id,"step","false");// 是否开始
+        $this->redis->hSet($table_id,"step_sequence","0");// 本局走的步数
+        $this->redis->hSet($table_id,"step_log_0","0");// 本局走地步数及用户
+        // 修改用户信息
+        $this->redis->hSet($user_id,"table_id",$table_id);
+        // 返回最新信息
+        $data = $this->redis->hGetAll($table_id);
+        $this->json(['status'=>"添加成功",$data]);
+    }
+
+    /**
+     * 获取房间信息
+     * @author 金
+     * @create time 2019-9-27 0027 13:57
+     */
+    public function get_table(){
+        $token = input("table_id");
+        $data = $this->redis->hGetAll($token);
+        $this->json($data);
+    }
+
+    public function delete_table(){
+        $table_id = input("table_id");
+        $this->redis->delete($table_id);
+//        $this->redis->hDel($table_id,"users");// 删除哈希数据中的某个键内容
+        $this->json("删除成功");
+    }
+
+    /**
+     * 设置用户
+     * 用户属性：
+     *      用户名
+     *      地图地址
+     *      金额
+     *      持有卡片
+     *      抵押物品
+     * @author 金
+     * @create time 2019-9-27 0027 11:14
+     */
+    public function set_user_name(){
+        $token = input("token");
+        $user_name = input("name");
+        $this->redis->hSet($token,"name",$user_name);
+        $this->json("success");
+    }
+
+    /**
+     * 设置地图
+     * @author 金
+     * @create time 2019-9-27 0027 11:12
+     */
+    public function get_user_info(){
+        $token = input("token");
+        $user = $this->redis->hGetAll($token);
+        if(empty($user)){
+            $this->json("没有用户信息");
+        }
+        $this->json($user);
+    }
+
+    /**
+     * 获取设置好的地区信息
+     * @author 金
+     * @create time 2019-9-27 0027 15:35
+     * @return mixed
+     */
+    private function get_house_info(){
+        $path = dirname(__FILE__)."/map/set_info.txt";
+        $file = fopen($path,"r+");
+        $info = fread($file,filesize($path));
+        fclose($file);
+        return json_decode($info,true);
+    }
+
+    /**
+     * 掷色子
+     * @author 金
+     * @create time 2019-9-27 0027 11:10
+     */
+    private function get_step(){
+        return random_int(1,12);
+    }
 
     /**
      * 设计地图
@@ -167,78 +345,6 @@ class Zillionaire extends Base
             }
         }
         return $map;
-    }
-
-
-    /**
-     * 获取房间信息
-     * @author 金
-     * @create time 2019-9-27 0027 13:57
-     */
-    public function get_table_info(){
-        $token = input("table_id");
-        $data = $this->redis->hGetAll($token);
-        var_dump($data);
-    }
-
-    /**
-     * 设置用户
-     * 用户属性：
-     *      用户名
-     *      地图地址
-     *      金额
-     *      持有卡片
-     *      抵押物品
-     *
-     * @author 金
-     * @create time 2019-9-27 0027 11:14
-     */
-    public function set_user_name(){
-        $token = input("token");
-        $user_name = input("name");
-        $user = $this->redis->hGet($token,"name");
-        if(empty($user)){
-            $this->json("用户不存在");
-        }
-        $this->redis->hSet($token,"name",$user_name);
-        $this->json("success");
-    }
-
-    /**
-     * 设置地图
-     * @author 金
-     * @create time 2019-9-27 0027 11:12
-     */
-    public function get_user_info(){
-        $token = input("token");
-        $user = $this->redis->hGetAll($token);
-        if(empty($user)){
-            $this->json("没有用户信息");
-        }
-        $this->json($user);
-    }
-
-    /**
-     * 获取设置好的地区信息
-     * @author 金
-     * @create time 2019-9-27 0027 15:35
-     * @return mixed
-     */
-    private function get_house_info(){
-        $path = dirname(__FILE__)."/map/set_info.txt";
-        $file = fopen($path,"r+");
-        $info = fread($file,filesize($path));
-        fclose($file);
-        return json_decode($info,true);
-    }
-
-    /**
-     * 掷色子
-     * @author 金
-     * @create time 2019-9-27 0027 11:10
-     */
-    private function get_step(){
-        return random_int(1,12);
     }
 
     /**
