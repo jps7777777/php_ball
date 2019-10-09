@@ -9,8 +9,6 @@
 namespace app\index\controller;
 
 
-
-
 class Zillionaire extends Base
 {
     protected $redis;
@@ -19,25 +17,25 @@ class Zillionaire extends Base
     // 红橙黄绿蓝靛紫
     // Red orange yellow green blue indigo violet
     protected $user_color = [
-        1=>"red",2=>"orange",3=>"yellow",4=>"green",5=>"blue",6=>"indigo",7=>"violet"
+        1 => "red", 2 => "orange", 3 => "yellow", 4 => "green", 5 => "blue", 6 => "indigo", 7 => "violet"
     ];
     protected $user_init = [
-        "money"=>2000,
-        "logo"=>0,// 用户图标:0没有图标及颜色
-        "color"=>'white',// 用户图标:0没有图标及颜色
-        "sequence"=>0,// 用户顺序
-        "city"=>"",// 持有土地:城市名,城市名
-        "pledge"=>"",// 抵押房产：城市名，城市名
-        "prison_break_card"=>false,
-        "status"=>1,// 0等待，1正常，2暂停一次，3破产
-        "money_card"=>"5000-0,2000-1,1000-0,500-0,200-0,100-0,50-0,20-0,10-0",//金钱面值-持有数量，金钱面值-持有数量，
+        "money" => 2000,
+        "logo" => 0,// 用户图标:0没有图标及颜色
+        "color" => 'white',// 用户图标:0没有图标及颜色
+        "sequence" => 0,// 用户顺序
+        "city" => "",// 持有土地:城市名,城市名
+        "pledge" => "",// 抵押房产：城市名，城市名
+        "prison_break_card" => false,
+        "status" => 1,// 0等待，1正常，2暂停一次，3破产
+        "money_card" => "5000-0,2000-1,1000-0,500-0,200-0,100-0,50-0,20-0,10-0",//金钱面值-持有数量，金钱面值-持有数量，
     ];
 
     public function __construct($flag = false)
     {
         parent::__construct($flag);
         $this->redis = new \Redis();
-        $this->redis->connect("47.105.151.214","6379","60");
+        $this->redis->connect("47.105.151.214", "6379", "60");
     }
 
     /**
@@ -69,40 +67,146 @@ class Zillionaire extends Base
      * @author 金
      * @create time 2019-9-27 0027 11:37
      */
-    public function index(){
+    public function index()
+    {
         $user_id = input("token");
-        if(empty($user_id)){
+        if (empty($user_id)) {
             $this->json("请先登录");
         }
         $table_id = input("table_id");
-        if(empty($table_id)){
+        if (empty($table_id)) {
             $this->json("房间不存在");
         }
         $data = $this->redis->hGetAll($table_id);
-        if(empty($data) ){
+//        $table_info = $this->redis->hMGet($table_id,['step','step_sequence','step_user','step_time']);
+//        var_dump($table_info);die;
+//        $map = json_decode($data['map'],true);
+//        var_dump($data);die;
+        if (empty($data)) {
             $this->json("房间不存在");
         }
-        if($data['user_num'] > $data['user_now']){
+        if ($data['user_num'] > $data['user_now']) {
             $this->json("玩家还没到齐啊，等等再开始啦。");
         }
-        if($data['user_num'] < $data['user_now']){
+        if ($data['user_num'] < $data['user_now']) {
             $this->json("请重新开始牌局。");
         }
         // 初始化用户信息：分配金钱，初始化持卡，初始化越狱卡持有状态
         $k = 1;
-        $users = json_decode($data['users'],true);
-//        foreach ($users as $a =>$b){
-//            $this->user_init['table_id'] = $table_id;
-//            $this->user_init['sequence'] = $k;
-//            $this->user_init['logo'] = $k;
-//            $this->user_init['color'] = $this->user_color[$k];
-//            $this->redis->hMSet($b,$this->user_init);
-//            $k++;
-//        }
-        $map = $this->get_map(count($users));
-        var_dump($map);die;
-        $this->redis->hSet($table_id,"map",$map);
+        $users = json_decode($data['users'], true);
+        foreach ($users as $a => $b) {
+            $this->user_init['table_id'] = $table_id;
+            $this->user_init['sequence'] = $k;
+            if ($k == 1) {
+                $this->redis->hSet($table_id, "step", "true");
+                $this->redis->hSet($table_id, "step_sequence", $k);
+                $this->redis->hSet($table_id, "step_user", $b);
+                $this->redis->hSet($table_id, "step_time", time());
+            }
+            $this->user_init['logo'] = $k;
+            $this->user_init['color'] = $this->user_color[$k];
+            $this->redis->hMSet($b, $this->user_init);
+            $k++;
+        }
+        // 设置地图
+        $tmp_map = $this->get_map(count($users));
+        $map_save = [];
+        foreach ($tmp_map as $i => $j) {
+            $map_save[$i] = json_encode($j, JSON_UNESCAPED_UNICODE);
+        }
+        $this->redis->hMSet("map_" . $table_id, $map_save);
+        // 返回房间信息
+        $new_res = $this->redis->hGetAll($table_id);
+        $new_res['users'] = json_decode($new_res['users'],true);
+        $map_res = $this->redis->hGetAll("map_" . $table_id);
+        foreach ($map_res as $x=>$y){
+            $new_res['map'][$x] = json_decode($y,true);
+        }
+        $this->json($new_res);
     }
+
+    /**
+     * 开始游戏
+     * @author 金
+     * @create time 2019-10-9 0009 14:11
+     */
+    public function run_step()
+    {
+        $user_id = input("token");
+        $table_id = input("table_id");
+//        if(){
+//
+//        }
+
+
+    }
+
+    /**
+     * 用户托管自动执行
+     * @author 金
+     * @create time 2019-10-9 0009 14:44
+     */
+    public function auto_run_user()
+    {
+        $user_id = input("token");
+    }
+
+    /**
+     * 机器人自动执行
+     * @author 金
+     * @create time 2019-10-9 0009 14:50
+     * @param string $table_id
+     * @param string $user_id
+     */
+    public function auto_run_robot($table_id = "", $user_id = '')
+    {
+        if (empty($table_id) || empty($user_id)) {
+            return;
+        }
+        $table_info = $this->redis->hMGet($table_id, ['step', 'step_sequence', 'step_user', 'step_time']);
+        if ($table_info['step_user'] != $user_id) {
+            return;
+        }
+        $step_num = $this->get_step();
+
+
+        var_dump($table_info);
+
+    }
+
+    /**
+     * 在服务器执行内容，前端仅显示
+     *
+     *
+     *
+     */
+
+    /**
+     * 获取房间信息
+     * @author 金
+     * @create time 2019-9-27 0027 13:57
+     */
+    public function get_table()
+    {
+        $table_id = input("table_id");
+        $user_id = input("token");
+        $step_num = input("step_num");
+        if (empty($table_id) || empty($user_id) || empty($step_num)) {
+            $this->json("执行出错1。");
+        }
+        $table_info = $this->redis->hMGet($table_id, ['step', 'step_sequence', 'step_user', 'step_time']);
+        if ($table_info['step_user'] != $user_id) {
+            $this->json("执行出错2。");
+        }
+        $step_user = $this->redis->hGet($table_id, "step_log");
+        if ($step_user != $user_id) {
+            $this->json("执行出错3。");
+        }
+
+
+//        $this->json($data);
+    }
+
 
     /**
      * 用户登录
@@ -111,11 +215,12 @@ class Zillionaire extends Base
      * @author 金
      * @create time 2019-9-27 0027 11:40
      */
-    public function use_token(){
-        $user_id = substr(\Request::token(),1,13);
+    public function use_token()
+    {
+        $user_id = substr(\Request::token(), 1, 13);
         // 保存用户信息
-        $this->redis->hSet($user_id,'name',$user_id);
-        $this->redis->hSet($user_id,'table_id',0);
+        $this->redis->hSet($user_id, 'name', $user_id);
+        $this->redis->hSet($user_id, 'table_id', 0);
         $this->json($user_id);
     }
 
@@ -125,23 +230,22 @@ class Zillionaire extends Base
      * @create time 2019-9-27 0027 13:51
      * @throws \Exception
      */
-    public function create_table(){
+    public function create_table()
+    {
         $token = $this->login_status();
         // 创建房间号并保存
-        $table_id = random_int(100000,999999);
-        $this->redis->hSet($token,"table",$table_id);
+        $table_id = random_int(100000, 999999);
+        $this->redis->hSet($token, "table", $table_id);
         // 保存房间信息
         $user_num = input("num");
-        if(empty($user_num)){
+        if (empty($user_num)) {
             $user_num = 4;
         }
-        $this->redis->hSet($table_id,"user_num",$user_num);
-        $this->redis->hSet($table_id,"user_now",1);
-        $this->redis->hSet($table_id,"users",json_encode([$token]));
-        $this->json("创建房间号:".$table_id);
+        $this->redis->hSet($table_id, "user_num", $user_num);
+        $this->redis->hSet($table_id, "user_now", 1);
+        $this->redis->hSet($table_id, "users", json_encode([$token]));
+        $this->json("创建房间号:" . $table_id);
     }
-
-
 
 
     /**
@@ -149,54 +253,45 @@ class Zillionaire extends Base
      * @author 金
      * @create time 2019-10-8 0008 11:48
      */
-    public function insert_table(){
+    public function insert_table()
+    {
         $user_id = input("token");
-        if(empty($user_id)){
+        if (empty($user_id)) {
             $this->json("请先登录");
         }
         $table_id = input("table_id");
-        if(empty($table_id)){
+        if (empty($table_id)) {
             $this->json("房间不存在");
         }
         // 设置房间信息
         $data = $this->redis->hGetAll($table_id);
-        if(empty($data['user_now'])){
+        if (empty($data['user_now'])) {
             $this->json("没有用户。");
         }
-        $user_now = $data['user_now']+1;
-        $users_old = json_decode($data['users'],true);
-        if(in_array($user_id,$users_old)){
+        $user_now = $data['user_now'] + 1;
+        $users_old = json_decode($data['users'], true);
+        if (in_array($user_id, $users_old)) {
             $this->json("用户已添加。");
         }
-        $users = array_merge($users_old,[$user_id]);
-        if($user_now > $data['user_num']){
+        $users = array_merge($users_old, [$user_id]);
+        if ($user_now > $data['user_num']) {
             $this->json("用户数已满，请重新开始牌局。");
         }
         // 修改房间用户信息
-        $this->redis->hSet($table_id,"user_now",$user_now);
-        $this->redis->hSet($table_id,"users",json_encode($users));
-        $this->redis->hSet($table_id,"step","false");// 是否开始
-        $this->redis->hSet($table_id,"step_sequence","0");// 本局走的步数
-        $this->redis->hSet($table_id,"step_log_0","0");// 本局走地步数及用户
+        $this->redis->hSet($table_id, "user_now", $user_now);
+        $this->redis->hSet($table_id, "users", json_encode($users));
+        $this->redis->hSet($table_id, "step", "false");// 是否开始
+        $this->redis->hSet($table_id, "step_sequence", "0");// 本局走的步数
+        $this->redis->hSet($table_id, "step_log_0", "0");// 本局走地步数及用户
         // 修改用户信息
-        $this->redis->hSet($user_id,"table_id",$table_id);
+        $this->redis->hSet($user_id, "table_id", $table_id);
         // 返回最新信息
         $data = $this->redis->hGetAll($table_id);
-        $this->json(['status'=>"添加成功",$data]);
+        $this->json(['status' => "添加成功", $data]);
     }
 
-    /**
-     * 获取房间信息
-     * @author 金
-     * @create time 2019-9-27 0027 13:57
-     */
-    public function get_table(){
-        $token = input("table_id");
-        $data = $this->redis->hGetAll($token);
-        $this->json($data);
-    }
-
-    public function delete_table(){
+    public function delete_table()
+    {
         $table_id = input("table_id");
         $this->redis->delete($table_id);
 //        $this->redis->hDel($table_id,"users");// 删除哈希数据中的某个键内容
@@ -214,10 +309,11 @@ class Zillionaire extends Base
      * @author 金
      * @create time 2019-9-27 0027 11:14
      */
-    public function set_user_name(){
+    public function set_user_name()
+    {
         $token = input("token");
         $user_name = input("name");
-        $this->redis->hSet($token,"name",$user_name);
+        $this->redis->hSet($token, "name", $user_name);
         $this->json("success");
     }
 
@@ -226,10 +322,11 @@ class Zillionaire extends Base
      * @author 金
      * @create time 2019-9-27 0027 11:12
      */
-    public function get_user_info(){
+    public function get_user_info()
+    {
         $token = input("token");
         $user = $this->redis->hGetAll($token);
-        if(empty($user)){
+        if (empty($user)) {
             $this->json("没有用户信息");
         }
         $this->json($user);
@@ -241,12 +338,13 @@ class Zillionaire extends Base
      * @create time 2019-9-27 0027 15:35
      * @return mixed
      */
-    private function get_house_info(){
-        $path = dirname(__FILE__)."/map/set_info.txt";
-        $file = fopen($path,"r+");
-        $info = fread($file,filesize($path));
+    private function get_house_info()
+    {
+        $path = dirname(__FILE__) . "/map/set_info.txt";
+        $file = fopen($path, "r+");
+        $info = fread($file, filesize($path));
         fclose($file);
-        return json_decode($info,true);
+        return json_decode($info, true);
     }
 
     /**
@@ -254,8 +352,9 @@ class Zillionaire extends Base
      * @author 金
      * @create time 2019-9-27 0027 11:10
      */
-    private function get_step(){
-        return random_int(1,12);
+    private function get_step()
+    {
+        return random_int(1, 12);
     }
 
     /**
@@ -266,23 +365,24 @@ class Zillionaire extends Base
      * @return array
      * @throws \Exception
      */
-    private function get_map($user_num){
+    private function get_map($user_num)
+    {
         $house = $this->get_house_info();
         $len = count($house);
         // 设置地图信息
         $map = [];
-        for($i = 0;$i< $user_num*10;$i++){
+        for ($i = 0; $i < $user_num * 10; $i++) {
             $map[$i] = [];
-            if($i%7 == 0 && $i != 0 && $i%5 != 0){
-                if($i/7 == 1 || $i/7 == 6){
+            if ($i % 7 == 0 && $i != 0 && $i % 5 != 0) {
+                if ($i / 7 == 1 || $i / 7 == 6) {
                     $map[$i]['name'] = "机会";
-                }elseif($i/7 == 2 || $i/7 == 7){
+                } elseif ($i / 7 == 2 || $i / 7 == 7) {
                     $map[$i]['name'] = "前进3";
-                }else{
+                } else {
                     $map[$i]['name'] = "命运";
                 }
             }
-            if($i%5 == 0 && $i%2 != 0){
+            if ($i % 5 == 0 && $i % 2 != 0) {
                 $map[$i]['name'] = "车站";
                 $map[$i]['price'] = 1500;
                 $map[$i]['pledge'] = 750;
@@ -292,16 +392,16 @@ class Zillionaire extends Base
                 $map[$i]['three_rates'] = 2000;
                 $map[$i]['four_rates'] = 5000;
             }
-            if($i%30 == 0 && $i != 0){
+            if ($i % 30 == 0 && $i != 0) {
                 $map[$i]['name'] = "坐牢";
             }
-            if($i == 0){
+            if ($i == 0) {
                 $map[$i]['name'] = "起点";
             }
-            if($i == 10){
+            if ($i == 10) {
                 $map[10] = "路过/牢房";
             }
-            if($i == 8){
+            if ($i == 8) {
                 $map[$i]['name'] = "电站";
                 $map[$i]['price'] = 1500;
                 $map[$i]['pledge'] = 750;
@@ -309,7 +409,7 @@ class Zillionaire extends Base
                 $map[$i]['one_rates'] = 350;
                 $map[$i]['two_rates'] = 1000;
             }
-            if($i == 28){
+            if ($i == 28) {
                 $map[$i]['name'] = "水站";
                 $map[$i]['price'] = 1500;
                 $map[$i]['pledge'] = 750;
@@ -317,7 +417,7 @@ class Zillionaire extends Base
                 $map[$i]['one_rates'] = 350;
                 $map[$i]['two_rates'] = 1000;
             }
-            if($i == 48){
+            if ($i == 48) {
                 $map[$i]['name'] = "气站";
                 $map[$i]['price'] = 1500;
                 $map[$i]['pledge'] = 750;
@@ -325,23 +425,23 @@ class Zillionaire extends Base
                 $map[$i]['one_rates'] = 350;
                 $map[$i]['two_rates'] = 1000;
             }
-            if($i == 3){
+            if ($i == 3) {
                 $map[$i]['name'] = "交税2000";
             }
-            if($i == $user_num*10-3){
+            if ($i == $user_num * 10 - 3) {
                 $map[$i]['name'] = "交税1000";
             }
-            if(empty($map[$i])){
-                do{
-                    $ttb = random_int(0,$len);
-                    if(isset($house[$ttb])){
+            if (empty($map[$i])) {
+                do {
+                    $ttb = random_int(0, $len);
+                    if (isset($house[$ttb])) {
                         $map[$i] = $house[$ttb];
                         unset($house[$ttb]);
                         $flag = false;
-                    }else{
+                    } else {
                         $flag = true;
                     }
-                }while($flag);
+                } while ($flag);
             }
         }
         return $map;
@@ -353,10 +453,11 @@ class Zillionaire extends Base
      * @author 金
      * @create time 2019-9-27 0027 13:47
      */
-    private function login_status(){
+    private function login_status()
+    {
         $token = input("token");
-        $user = $this->redis->hGet($token,"name");
-        if(empty($token) || empty($user)){
+        $user = $this->redis->hGet($token, "name");
+        if (empty($token) || empty($user)) {
             $this->json("用户不存在");
         }
         return $token;
@@ -367,29 +468,30 @@ class Zillionaire extends Base
      * @author 金
      * @create time 2019-9-27 0027 10:59
      */
-    private function get_opportunity(){
+    private function get_opportunity()
+    {
         $res = [
-            0=>"退9格",
-            1=>"出狱卡",
-            2=>"得到500",
-            3=>"罚款300",
-            4=>"给钱最少的200",
-            5=>"罚款200",
-            6=>"得到300",
-            7=>"罚款800",
-            8=>"房子最少的建一栋",
-            9=>"房子最多的拆一栋",
-            10=>"停一次",
-            11=>"得到650",
-            12=>"再掷一次",
-            13=>"罚款200",
-            14=>"钱最多的人罚款2000",
-            15=>"交税1000",
-            16=>"得到950",
-            17=>"给每个人500",
-            18=>"给每个人50",
+            0 => "退9格",
+            1 => "出狱卡",
+            2 => "得到500",
+            3 => "罚款300",
+            4 => "给钱最少的200",
+            5 => "罚款200",
+            6 => "得到300",
+            7 => "罚款800",
+            8 => "房子最少的建一栋",
+            9 => "房子最多的拆一栋",
+            10 => "停一次",
+            11 => "得到650",
+            12 => "再掷一次",
+            13 => "罚款200",
+            14 => "钱最多的人罚款2000",
+            15 => "交税1000",
+            16 => "得到950",
+            17 => "给每个人500",
+            18 => "给每个人50",
         ];
-        return $res[random_int(0,18)];
+        return $res[random_int(0, 18)];
     }
 
     /**
@@ -397,36 +499,38 @@ class Zillionaire extends Base
      * @author 金
      * @create time 2019-9-27 0027 10:59
      */
-    private function get_fortune(){
+    private function get_fortune()
+    {
         $res = [
-            0=>"停一次",
-            1=>"出狱卡",
-            2=>"得到500",
-            3=>"罚款300",
-            4=>"回到起点并得2000",
-            5=>"得到800",
-            6=>"得到900",
-            7=>"罚款800",
-            8=>"房子最少的建一栋",
-            9=>"房子最多的拆一栋",
-            10=>"停一次",
-            11=>"前进5次",
-            12=>"坐牢",
-            13=>"罚款200",
-            14=>"钱最多的人罚款2000",
-            15=>"交税1000",
-            16=>"得到1500",
-            17=>"每个人给抽卡人500",
-            18=>"每个人给抽卡人50",
+            0 => "停一次",
+            1 => "出狱卡",
+            2 => "得到500",
+            3 => "罚款300",
+            4 => "回到起点并得2000",
+            5 => "得到800",
+            6 => "得到900",
+            7 => "罚款800",
+            8 => "房子最少的建一栋",
+            9 => "房子最多的拆一栋",
+            10 => "停一次",
+            11 => "前进5次",
+            12 => "坐牢",
+            13 => "罚款200",
+            14 => "钱最多的人罚款2000",
+            15 => "交税1000",
+            16 => "得到1500",
+            17 => "每个人给抽卡人500",
+            18 => "每个人给抽卡人50",
         ];
-        return $res[random_int(0,18)];
+        return $res[random_int(0, 18)];
     }
 
 
     // *********************************************  备用方法 ********************************************************
 
 
-    private function get_house_info_tmp(){
+    private function get_house_info_tmp()
+    {
 //        $map = [];// 13/41/42/51/52/53
 //        $exp = ["北京市","天津市","上海市","重庆市"];
 //        $province = ["石家庄市","邯郸市","洛阳市","开封市","武汉市","成都市",
