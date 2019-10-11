@@ -28,6 +28,7 @@ class Zillionaire extends Base
         "pledge" => "",// 抵押房产：城市名，城市名
         "prison_break_card" => false,
         "status" => 1,// 0等待，1正常，2暂停一次，3破产
+        "map_step_num" => 0,// 地图上走的步数
         "money_card" => "5000-0,2000-1,1000-0,500-0,200-0,100-0,50-0,20-0,10-0",//金钱面值-持有数量，金钱面值-持有数量，
     ];
 
@@ -117,10 +118,10 @@ class Zillionaire extends Base
         $this->redis->hMSet("map_" . $table_id, $map_save);
         // 返回房间信息
         $new_res = $this->redis->hGetAll($table_id);
-        $new_res['users'] = json_decode($new_res['users'],true);
+        $new_res['users'] = json_decode($new_res['users'], true);
         $map_res = $this->redis->hGetAll("map_" . $table_id);
-        foreach ($map_res as $x=>$y){
-            $new_res['map'][$x] = json_decode($y,true);
+        foreach ($map_res as $x => $y) {
+            $new_res['map'][$x] = json_decode($y, true);
         }
         $this->json($new_res);
     }
@@ -135,15 +136,165 @@ class Zillionaire extends Base
         $user_id = input("token");
         $table_id = input("table_id");
         $step_num = input("step_num");
-        if(empty($user_id) || empty($table_id) || $step_num<1){
+        if (empty($user_id) || empty($table_id) || $step_num < 1) {
             $this->json("参数错误");
         }
+//        var_dump($user_id, $table_id, $step_num);
         // 位置前进$step_num步，查看地图信息
+        $user = $this->redis->hGetAll($user_id);
+//        var_dump($user);die;
+        if (empty($user)) {
+            $this->json("用户不存在");
+        }
+        if ($user['status'] == 2) {
+            $this->json("用户暂停结束");
+        }
+        if ($user['status'] == 3) {
+            $this->json("game over");
+        }
 
-
-
-
+        // table_info 设置地图信息,返回下一个执行用户
+        $map_info = $this->redis->hGetAll($table_id);
+        if (empty($map_info)) {
+            $this->json("系统错误");
+        }
+        if($user_id != $map_info['step_log']){
+            $this->json("执行顺序错误");
+        }
+        /**
+         * 返回给该用户的操作，数组信息说明：
+         * 第一个参数表示执行标志，第二个参数表示执行内容
+         *  0、系统错误
+         *  1、什么也不干
+         * 2、前进
+         * 3、退回
+         * 4、暂停
+         * 5、再来一次
+         * 6、罚款
+         * 7、缴费
+         * 8、命运
+         * 9、机会
+         * 10、获得奖励
+         * 11、选择是否购买土地
+         * 12、选择是否建设房子（1，2，3）
+         */
+        $res = $this->run_event($table_id, $map_info, $user_id, $user, $step_num);
+//        if ($res[0] < 5) {
+//             TODO 下一个用户，向下一个用户发出运行命令
+//            $next_user = $this->get_next_step_user($map_info, $user_id);
+//            $this->redis->hSet($table_id, "step_log", $next_user);// 下一个执行用户
+//            $this->tip_next_user();
+//            echo "不需要操作，到下家操作";
+//        }
+        $o_res['message'] = json_decode($res[1],true);
+        $o_res['status'] = 11;
+        $this->json($o_res);
     }
+
+    /**
+     *
+     *  0、系统错误
+     *  1、什么也不干
+     * 2、前进
+     * 3、退回
+     * 4、暂停
+     * 5、再来一次
+     * 6、罚款
+     * 7、缴费
+     * 8、命运
+     * 9、机会
+     * 10、获得奖励
+     * 11、选择是否购买土地
+     * 12、选择是否建设房子（1，2，3）
+     *
+     * @author 金
+     * @create time 2019-10-11 0011 16:17
+     * @param $table_id
+     * @param $table
+     * @param $user_id
+     * @param $user
+     * @param $step_num
+     * @return array|string
+     */
+    private function run_event($table_id, $table, $user_id, $user, $step_num)
+    {
+        if (empty($table_id) || empty($table) || empty($user_id) || empty($user) || empty($step_num)) {
+            return [0, "系统错误"];
+        }
+        $map = $this->redis->hGetAll("map_" . $table_id);
+        var_dump($map);die;
+        var_dump($user);
+        if (empty($map)) {
+            return [0, "系统错误"];
+        }
+        // $user_id 添加移动位置
+        if(empty($user['map_step_num'])){
+            $map_id = $step_num;
+            $this->redis->hSet($user_id,"map_step_num",$step_num);
+        }else{
+            $map_id = $user['map_step_num'] + $step_num;
+            $map_step_num = $this->redis->hGet($user_id,"map_step_num");
+            if(($step_num+$map_step_num)>=count($map)){
+                $map_step_num_new = $map_step_num+$step_num-count($map);
+            }else{
+                $map_step_num_new = $step_num+$map_step_num;
+            }
+            $this->redis->hSet($user_id,"map_step_num",$map_step_num_new);
+        }
+        // 判断地图信息 ,多线程给钱
+        // 使用消息队列，给2000
+        if($map_id >= count($map)){
+            // TODO 新增消息，添加2000元
+            // 前端添加2000
+            $money = $this->redis->hGet($user_id,"money");
+            $this->redis->hSet($user_id,"money",$money+2000);
+            $map_id = $map_id-count($map);
+        }
+        var_dump($map_id);
+        // 解析地图信息
+        $info = $map[$map_id];
+        $city = json_decode($info, true);
+        $city['id'] = $map_id;
+        var_dump($city);
+        die;
+        // 可以购买的城市或车站
+        if (stripos($city['name'], "市") || stripos($city['name'], "站")) {
+            if (empty($city['belong']) && $user['money'] >= $city['price']) {
+                return [11, json_encode($city, JSON_UNESCAPED_UNICODE)];
+            }
+            if (empty($city['belong']) && $user['money'] < $city['price']) {
+                return [1, "路过"];
+            }
+            if ($city['belong'] && empty($city['pledged']) && $city['belong'] != $user_id) {
+                return [7, $city[$city['house'] . '_house_rates']];
+            }
+            if ($city['belong'] && empty($city['pledged']) && $city['belong'] == $user_id && $user['money'] > $city['build_house']) {
+                return [12, "花".$city['build_house']."元，建房子。"];
+            }
+        }
+        if($city['name'] == '交税2000'){
+            return [6,"2000"];
+        }
+        if($city['name'] == '交税1000'){
+            return [6,"1000"];
+        }
+        if($city['name'] == '坐牢'){
+            $this->redis->hSet($user_id,"map_step_num",10);
+            return [3,"坐牢"];
+        }
+        if($city['name'] == '命运'){
+            return [8,"抽命运卡"];
+        }
+        if($city['name'] == '机会'){
+            return [9,"抽机会卡"];
+        }
+        if($city['name'] == '机会'){
+            return [9,"抽机会卡"];
+        }
+
+        return [1, "路过"];
+    }
+
 
     /**
      * 用户托管自动执行
@@ -154,8 +305,6 @@ class Zillionaire extends Base
     {
         $user_id = input("token");
     }
-
-
 
 
     /**
@@ -210,11 +359,8 @@ class Zillionaire extends Base
             $this->json("执行出错3。");
         }
 
-
 //        $this->json($data);
     }
-
-
 
 
     /**
@@ -239,7 +385,6 @@ class Zillionaire extends Base
         $this->redis->hSet($table_id, "users", json_encode([$token]));
         $this->json("创建房间号:" . $table_id);
     }
-
 
     /**
      * 加入房间
@@ -290,8 +435,6 @@ class Zillionaire extends Base
 //        $this->redis->hDel($table_id,"users");// 删除哈希数据中的某个键内容
         $this->json("删除成功");
     }
-
-
 
     /**
      * 用户登录
@@ -344,68 +487,6 @@ class Zillionaire extends Base
     }
 
     /**
-     * 创建聊天窗口
-     * @author 金
-     * @create time 2019-10-10 0010 15:42
-     */
-    public function create_socket(){
-//        $host = "";
-//        $port = "";
-//        $socket = socket_create(AF_INET6,SOCK_STREAM,SOL_TCP);
-//        socket_set_option($socket, SOL_SOCKET, SO_REUSEADDR, 1);
-//        socket_bind($socket, $host, $port);
-//        socket_listen($socket, self::LISTEN_SOCKET_NUM);
-//创建服务端的socket套接流,net协议为IPv4，protocol协议为TCP
-        $socket = socket_create(AF_INET,SOCK_STREAM,SOL_TCP);
-
-        /*绑定接收的套接流主机和端口,与客户端相对应*/
-        if(socket_bind($socket,'127.0.0.1',8888) == false){
-            echo 'server bind fail:'.socket_strerror(socket_last_error());
-            /*这里的127.0.0.1是在本地主机测试，你如果有多台电脑，可以写IP地址*/
-        }
-        //监听套接流
-        if(socket_listen($socket,4)==false){
-            echo 'server listen fail:'.socket_strerror(socket_last_error());
-        }
-
-        $start_time = time();
-        $flag = true;
-//让服务器无限获取客户端传过来的信息
-        do{
-            /*接收客户端传过来的信息*/
-            $accept_resource = socket_accept($socket);
-            /*socket_accept的作用就是接受socket_bind()所绑定的主机发过来的套接流*/
-
-            if($accept_resource !== false){
-                /*读取客户端传过来的资源，并转化为字符串*/
-                $string = socket_read($accept_resource,1024);
-                /*socket_read的作用就是读出socket_accept()的资源并把它转化为字符串*/
-
-                echo 'server receive is :'.$string.PHP_EOL;//PHP_EOL为php的换行预定义常量
-                if($string != false){
-                    $return_client = 'server receive is : '.$string.PHP_EOL;
-                    /*向socket_accept的套接流写入信息，也就是回馈信息给socket_bind()所绑定的主机客户端*/
-                    socket_write($accept_resource,$return_client,strlen($return_client));
-                    /*socket_write的作用是向socket_create的套接流写入信息，或者向socket_accept的套接流写入信息*/
-                }else{
-                    echo 'socket_read is fail';
-                }
-                /*socket_close的作用是关闭socket_create()或者socket_accept()所建立的套接流*/
-//        socket_close($accept_resource);
-
-            }
-            // 关闭连接
-            $end_time = time();
-            if($end_time >= $start_time+120){
-                $flag = false;
-            }
-        }while($flag);
-        socket_close($socket);
-        $this->json("game over");
-    }
-
-
-    /**
      * 获取设置好的地区信息
      * @author 金
      * @create time 2019-9-27 0027 15:35
@@ -429,6 +510,36 @@ class Zillionaire extends Base
     {
         return random_int(1, 12);
     }
+
+    /**
+     * 获取运行的下一个用户
+     * @author 金
+     * @create time 2019-10-11 0011 14:33
+     * @param $table
+     * @param $user_id
+     * @return bool|string
+     */
+    private function get_next_step_user($table, $user_id)
+    {
+        if (empty($table) || empty($user_id)) {
+            return false;
+        }
+        $users = json_decode($table['users'], true);
+        $now = $table[$user_id];
+        if ($now == count($users)) {
+            $next_num = 1;
+        } else {
+            $next_num = $now + 1;
+        }
+        $next = "";
+        foreach ($users as $a) {
+            if ($table[$a] == $next_num) {
+                $next = $a;
+            }
+        }
+        return $next;
+    }
+
 
     /**
      * 设计地图
@@ -472,7 +583,7 @@ class Zillionaire extends Base
                 $map[$i]['name'] = "起点";
             }
             if ($i == 10) {
-                $map[10] = "路过/牢房";
+                $map[10]['name'] = "路过/牢房";
             }
             if ($i == 8) {
                 $map[$i]['name'] = "电站";
