@@ -158,7 +158,7 @@ class Zillionaire extends Base
         if (empty($map_info)) {
             $this->json("系统错误");
         }
-        if($user_id != $map_info['step_log']){
+        if ($user_id != $map_info['step_log']) {
             $this->json("执行顺序错误");
         }
         /**
@@ -179,15 +179,12 @@ class Zillionaire extends Base
          * 12、选择是否建设房子（1，2，3）
          */
         $res = $this->run_event($table_id, $map_info, $user_id, $user, $step_num);
-//        if ($res[0] < 5) {
-//             TODO 下一个用户，向下一个用户发出运行命令
-//            $next_user = $this->get_next_step_user($map_info, $user_id);
-//            $this->redis->hSet($table_id, "step_log", $next_user);// 下一个执行用户
-//            $this->tip_next_user();
-//            echo "不需要操作，到下家操作";
-//        }
-        $o_res['message'] = json_decode($res[1],true);
-        $o_res['status'] = 11;
+        if ($res[0] == 11) {
+            $o_res['message'] = json_decode($res[1], true);
+        } else {
+            $o_res['message'] = $res[1];
+        }
+        $o_res['status'] = $res[0];
         $this->json($o_res);
     }
 
@@ -222,41 +219,30 @@ class Zillionaire extends Base
             return [0, "系统错误"];
         }
         $map = $this->redis->hGetAll("map_" . $table_id);
-        var_dump($map);die;
-        var_dump($user);
         if (empty($map)) {
             return [0, "系统错误"];
         }
-        // $user_id 添加移动位置
-        if(empty($user['map_step_num'])){
+        // 用户移动设置
+        $user_step_old = $this->redis->hGet($user_id,"map_step_num");
+        if(empty($user_step_old)){
             $map_id = $step_num;
-            $this->redis->hSet($user_id,"map_step_num",$step_num);
+            $this->redis->hSet($user_id, "map_step_num", $step_num);
         }else{
-            $map_id = $user['map_step_num'] + $step_num;
-            $map_step_num = $this->redis->hGet($user_id,"map_step_num");
-            if(($step_num+$map_step_num)>=count($map)){
-                $map_step_num_new = $map_step_num+$step_num-count($map);
-            }else{
-                $map_step_num_new = $step_num+$map_step_num;
+            $map_id = $user_step_old + $step_num;
+            // 用户过起点，添加2000元
+            if($map_id>=count($map)){
+                $map_id = $map_id-count($map);
+                $money = $this->redis->hGet($user_id, "money");
+                $this->redis->hSet($user_id, "money", $money + 2000);
             }
-            $this->redis->hSet($user_id,"map_step_num",$map_step_num_new);
+            $this->redis->hSet($user_id, "map_step_num", $map_id);
         }
         // 判断地图信息 ,多线程给钱
         // 使用消息队列，给2000
-        if($map_id >= count($map)){
-            // TODO 新增消息，添加2000元
-            // 前端添加2000
-            $money = $this->redis->hGet($user_id,"money");
-            $this->redis->hSet($user_id,"money",$money+2000);
-            $map_id = $map_id-count($map);
-        }
-        var_dump($map_id);
         // 解析地图信息
         $info = $map[$map_id];
         $city = json_decode($info, true);
         $city['id'] = $map_id;
-        var_dump($city);
-        die;
         // 可以购买的城市或车站
         if (stripos($city['name'], "市") || stripos($city['name'], "站")) {
             if (empty($city['belong']) && $user['money'] >= $city['price']) {
@@ -269,32 +255,113 @@ class Zillionaire extends Base
                 return [7, $city[$city['house'] . '_house_rates']];
             }
             if ($city['belong'] && empty($city['pledged']) && $city['belong'] == $user_id && $user['money'] > $city['build_house']) {
-                return [12, "花".$city['build_house']."元，建房子。"];
+                return [12, "花" . $city['build_house'] . "元，建房子。"];
             }
         }
-        if($city['name'] == '交税2000'){
-            return [6,"2000"];
+        if ($city['name'] == '交税2000') {
+            return [6, "2000"];
         }
-        if($city['name'] == '交税1000'){
-            return [6,"1000"];
+        if ($city['name'] == '交税1000') {
+            return [6, "1000"];
         }
-        if($city['name'] == '坐牢'){
-            $this->redis->hSet($user_id,"map_step_num",10);
-            return [3,"坐牢"];
+        if ($city['name'] == '坐牢') {
+            $this->redis->hSet($user_id, "map_step_num", 10);
+            return [3, "坐牢"];
         }
-        if($city['name'] == '命运'){
-            return [8,"抽命运卡"];
+        if ($city['name'] == '命运') {
+            return [8, "抽命运卡"];
         }
-        if($city['name'] == '机会'){
-            return [9,"抽机会卡"];
+        if ($city['name'] == '机会') {
+            return [9, "抽机会卡"];
         }
-        if($city['name'] == '机会'){
-            return [9,"抽机会卡"];
+        if ($city['name'] == '机会') {
+            return [9, "抽机会卡"];
         }
-
         return [1, "路过"];
     }
 
+    /**
+     * 执行动作类型：type
+     * 1、向银行缴罚款
+     * 2、缴过路费费
+     * 3、获得奖励
+     * 4、暂停一次
+     * 5、 TODO 其他命令
+     *
+     *
+     * 4、选择是否购买土地
+     * 5、选择是否建设房子（1，2，3）
+     * 6、抵押土地
+     * @author 金
+     * @create time 2019-10-12 0012 11:30
+     */
+    public function execute_action(){
+        $user_id = input("token");
+        $table_id = input("table_id");
+        $type = input("type");// 执行动作类型
+        $param = input("param");
+        if(empty($user_id) || empty($table_id) || empty($type)){
+            $this->json("参数错误");
+        }
+        // 向银行交罚款
+        if($type == 1){
+            // TODO 设置钱币
+            if($param < 10){
+                $this->json("参数错误");
+            }
+            $flag = $this->user_money_dec($user_id,$param);
+        }
+        // 缴过路费
+        if($type == 2){
+            if(empty($param)){
+                $this->json("参数错误");
+            }
+            $arr = json_decode($param,true);
+            $flag_dec = $this->user_money_dec($user_id,$arr['money']);
+            $flag_asc = $this->user_money_asc($arr['belong'],$arr['money']);
+
+
+        }
+        // TODO 获得奖励
+        if($type == 3){
+            if(empty($param)){
+                $this->json("参数错误");
+            }
+            $arr = json_decode($param,true);
+            $flag_asc = $this->user_money_asc($user_id,$arr['money']);
+        }
+        if($type == 4){
+
+        }
+
+
+    }
+
+    private function user_money_dec($user_id,$money){
+        if(empty($user_id) || empty($money)){
+            return "参数错误";
+        }
+        $money_old = $this->redis->hGet($user_id,"money");
+        if($money_old<$money){
+            return "钱币不足";
+        }
+        $money_new = $money_old-$money;
+        $this->redis->hSet($user_id,"money",$money_new);
+        return true;
+    }
+
+    private function user_money_asc($user_id,$money){
+        if(empty($user_id) || empty($money)){
+            return "参数错误";
+        }
+        $money_old = $this->redis->hGet($user_id,"money");
+        if($money_old<$money){
+            return "钱币不足";
+        }
+        $money_new = intval($money_old)+intval($money);
+        $this->redis->hSet($user_id,"money",$money_new);
+        return true;
+    }
 
     /**
      * 用户托管自动执行
