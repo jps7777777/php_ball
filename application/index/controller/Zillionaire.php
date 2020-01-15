@@ -320,7 +320,6 @@ class Zillionaire extends Base
             $flag_dec = $this->user_money_dec($user_id,$arr['money']);
             $flag_asc = $this->user_money_asc($arr['belong'],$arr['money']);
 
-
         }
         // TODO 获得奖励
         if($type == 3){
@@ -330,12 +329,22 @@ class Zillionaire extends Base
             $arr = json_decode($param,true);
             $flag_asc = $this->user_money_asc($user_id,$arr['money']);
         }
+        // TODO 暂停一次
         if($type == 4){
+
+        }
+        // TODO
+        if($type == 5){
 
         }
 
 
     }
+
+    private function uncoding_more(){
+
+    }
+
 
     private function user_money_dec($user_id,$money){
         if(empty($user_id) || empty($money)){
